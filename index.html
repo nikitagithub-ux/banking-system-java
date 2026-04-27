@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>NovBank — Banking System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+    <style>
+        :root {
+            --bg:       #080c10;
+            --surface:  #0e1419;
+            --card:     #131a22;
+            --border:   #1e2a35;
+            --accent:   #00d4aa;
+            --accent2:  #0095ff;
+            --danger:   #ff4d6d;
+            --warn:     #ffb347;
+            --text:     #e8edf2;
+            --muted:    #5a7080;
+            --success:  #00d4aa;
+        }
+
+        * { margin:0; padding:0; box-sizing:border-box; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'DM Mono', monospace;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ── GRID BACKGROUND ── */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+                    linear-gradient(rgba(0,212,170,0.03) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(0,212,170,0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* ── GLOW ORBS ── */
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(120px);
+            opacity: 0.12;
+            pointer-events: none;
+            z-index: 0;
+        }
+        .orb1 { width:500px; height:500px; background:var(--accent); top:-100px; left:-100px; }
+        .orb2 { width:400px; height:400px; background:var(--accent2); bottom:-50px; right:-50px; }
+
+        /* ── SCREENS ── */
+        .screen {
+            display: none;
+            position: relative;
+            z-index: 1;
+            min-height: 100vh;
+        }
+        .screen.active { display: flex; }
+
+        /* ══════════════ AUTH SCREEN ══════════════ */
+        #auth-screen {
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 0;
+        }
+
+        .auth-logo {
+            font-family: 'Syne', sans-serif;
+            font-size: 2.8rem;
+            font-weight: 800;
+            letter-spacing: -2px;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: fadeDown 0.6s ease both;
+        }
+
+        .auth-tagline {
+            color: var(--muted);
+            font-size: 0.75rem;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            margin-bottom: 48px;
+            animation: fadeDown 0.6s 0.1s ease both;
+        }
+
+        .auth-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 40px;
+            width: 100%;
+            max-width: 420px;
+            animation: fadeUp 0.6s 0.2s ease both;
+            box-shadow: 0 32px 80px rgba(0,0,0,0.5);
+        }
+
+        .auth-tabs {
+            display: flex;
+            gap: 4px;
+            background: var(--surface);
+            border-radius: 10px;
+            padding: 4px;
+            margin-bottom: 32px;
+        }
+
+        .auth-tab {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: 'Syne', sans-serif;
+            font-weight: 600;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+            background: transparent;
+            color: var(--muted);
+        }
+        .auth-tab.active {
+            background: var(--accent);
+            color: var(--bg);
+        }
+
+        .form-group { margin-bottom: 20px; }
+
+        label {
+            display: block;
+            font-size: 0.7rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 8px;
+        }
+
+        input[type=text], input[type=password], input[type=number], select {
+            width: 100%;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px 16px;
+            color: var(--text);
+            font-family: 'DM Mono', monospace;
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input:focus, select:focus { border-color: var(--accent); }
+        select option { background: var(--card); }
+
+        .btn {
+            width: 100%;
+            padding: 13px;
+            border: none;
+            border-radius: 8px;
+            font-family: 'Syne', sans-serif;
+            font-weight: 700;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            letter-spacing: 0.5px;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            color: var(--bg);
+        }
+        .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn-secondary {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text);
+        }
+        .btn-secondary:hover { border-color: var(--accent); }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-sm {
+            width: auto;
+            padding: 8px 16px;
+            font-size: 0.8rem;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 32px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 14px 24px;
+            font-size: 0.85rem;
+            z-index: 1000;
+            transition: transform 0.3s ease;
+            white-space: nowrap;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+        }
+        .toast.show { transform: translateX(-50%) translateY(0); }
+        .toast.success { border-color: var(--success); color: var(--success); }
+        .toast.error   { border-color: var(--danger);  color: var(--danger); }
+        .toast.info    { border-color: var(--accent2); color: var(--accent2); }
+
+        /* ══════════════ DASHBOARD SCREEN ══════════════ */
+        #dash-screen { flex-direction: column; }
+
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 40px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(13,20,28,0.8);
+            backdrop-filter: blur(10px);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .topbar-logo {
+            font-family: 'Syne', sans-serif;
+            font-weight: 800;
+            font-size: 1.4rem;
+            letter-spacing: -1px;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .topbar-user {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .user-badge {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-size: 0.8rem;
+            color: var(--accent);
+        }
+
+        .btn-logout {
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 16px;
+            color: var(--muted);
+            font-family: 'DM Mono', monospace;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-logout:hover { border-color: var(--danger); color: var(--danger); }
+
+        .dash-content { padding: 40px; max-width: 1100px; margin: 0 auto; width: 100%; }
+
+        /* ── TABS ── */
+        .dash-tabs {
+            display: flex;
+            gap: 4px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 4px;
+            margin-bottom: 32px;
+            width: fit-content;
+        }
+
+        .dash-tab {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: 'Syne', sans-serif;
+            font-weight: 600;
+            font-size: 0.8rem;
+            letter-spacing: 0.5px;
+            transition: all 0.2s;
+            background: transparent;
+            color: var(--muted);
+        }
+        .dash-tab.active { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+
+        .tab-pane { display: none; }
+        .tab-pane.active { display: block; animation: fadeUp 0.3s ease both; }
+
+        /* ── SECTION HEADER ── */
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+        }
+
+        .section-title {
+            font-family: 'Syne', sans-serif;
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--text);
+        }
+
+        /* ── ACCOUNT CARDS ── */
+        .accounts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .account-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 24px;
+            cursor: pointer;
+            transition: all 0.25s;
+            position: relative;
+            overflow: hidden;
+        }
+        .account-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--accent), var(--accent2));
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .account-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+        .account-card:hover::before { opacity: 1; }
+        .account-card.locked { opacity: 0.5; cursor: not-allowed; }
+
+        .card-bank {
+            font-family: 'Syne', sans-serif;
+            font-weight: 700;
+            font-size: 1rem;
+            margin-bottom: 6px;
+            color: var(--text);
+        }
+
+        .card-type {
+            font-size: 0.7rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 20px;
+        }
+
+        .card-accno {
+            font-size: 0.75rem;
+            color: var(--muted);
+            letter-spacing: 1px;
+            padding: 6px 10px;
+            background: var(--surface);
+            border-radius: 6px;
+            margin-bottom: 4px;
+            display: inline-block;
+        }
+
+        .lock-badge {
+            display: inline-block;
+            background: rgba(255,77,109,0.15);
+            color: var(--danger);
+            border: 1px solid rgba(255,77,109,0.3);
+            border-radius: 6px;
+            padding: 3px 10px;
+            font-size: 0.7rem;
+            letter-spacing: 1px;
+            margin-top: 8px;
+        }
+
+        .no-accounts {
+            text-align: center;
+            padding: 60px;
+            color: var(--muted);
+            border: 1px dashed var(--border);
+            border-radius: 14px;
+        }
+        .no-accounts p { margin-bottom: 16px; font-size: 0.9rem; }
+
+        /* ── OPEN ACCOUNT FORM ── */
+        .form-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 32px;
+            max-width: 500px;
+        }
+
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+        /* ── PORTFOLIO ── */
+        .portfolio-header {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 32px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .portfolio-total-label {
+            font-size: 0.7rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 8px;
+        }
+
+        .portfolio-total {
+            font-family: 'Syne', sans-serif;
+            font-size: 2.4rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .portfolio-table {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            overflow: hidden;
+        }
+
+        table { width: 100%; border-collapse: collapse; }
+        th {
+            padding: 14px 20px;
+            text-align: left;
+            font-size: 0.65rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--muted);
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+        }
+        td {
+            padding: 16px 20px;
+            font-size: 0.85rem;
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+        }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: rgba(255,255,255,0.02); }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 6px;
+            font-size: 0.7rem;
+            letter-spacing: 1px;
+        }
+        .badge-savings { background: rgba(0,212,170,0.1); color: var(--accent); border: 1px solid rgba(0,212,170,0.2); }
+        .badge-current { background: rgba(0,149,255,0.1); color: var(--accent2); border: 1px solid rgba(0,149,255,0.2); }
+        .badge-locked  { background: rgba(255,77,109,0.1); color: var(--danger);  border: 1px solid rgba(255,77,109,0.2); }
+
+        /* ── MODAL ── */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(6px);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.active { display: flex; }
+
+        .modal {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 36px;
+            width: 100%;
+            max-width: 440px;
+            animation: fadeUp 0.3s ease both;
+            box-shadow: 0 40px 100px rgba(0,0,0,0.6);
+        }
+
+        .modal-title {
+            font-family: 'Syne', sans-serif;
+            font-weight: 700;
+            font-size: 1.2rem;
+            margin-bottom: 6px;
+        }
+
+        .modal-sub {
+            color: var(--muted);
+            font-size: 0.8rem;
+            margin-bottom: 28px;
+        }
+
+        .modal-actions { display: flex; gap: 12px; margin-top: 24px; }
+        .modal-actions .btn { flex: 1; }
+
+        /* ── OPERATION MENU ── */
+        .op-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .op-btn {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: left;
+            color: var(--text);
+            font-family: 'DM Mono', monospace;
+        }
+        .op-btn:hover { border-color: var(--accent); background: rgba(0,212,170,0.05); }
+        .op-btn .op-icon { font-size: 1.4rem; margin-bottom: 8px; display: block; }
+        .op-btn .op-label { font-family: 'Syne', sans-serif; font-weight: 600; font-size: 0.85rem; }
+
+        /* ── TRANSACTIONS LIST ── */
+        .tx-list { display: flex; flex-direction: column; gap: 8px; }
+
+        .tx-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 20px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+        }
+
+        .tx-left { display: flex; align-items: center; gap: 14px; }
+
+        .tx-icon {
+            width: 36px; height: 36px;
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+        .tx-icon.credit { background: rgba(0,212,170,0.1); }
+        .tx-icon.debit  { background: rgba(255,77,109,0.1); }
+        .tx-icon.transfer { background: rgba(0,149,255,0.1); }
+
+        .tx-type { font-family: 'Syne', sans-serif; font-weight: 600; font-size: 0.85rem; }
+        .tx-date { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
+        .tx-related { font-size: 0.7rem; color: var(--muted); }
+
+        .tx-amount { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 0.95rem; }
+        .tx-amount.credit { color: var(--accent); }
+        .tx-amount.debit  { color: var(--danger); }
+        .tx-amount.transfer-sent { color: var(--warn); }
+        .tx-amount.transfer-recv { color: var(--accent); }
+
+        .balance-display {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px 24px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .balance-label { font-size: 0.7rem; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+        .balance-value { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.6rem; color: var(--accent); }
+
+        /* ── ANIMATIONS ── */
+        @keyframes fadeDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .divider { height: 1px; background: var(--border); margin: 24px 0; }
+
+        .pin-input {
+            text-align: center;
+            font-size: 1.4rem;
+            letter-spacing: 8px;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body>
+
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+<div id="toast" class="toast"></div>
+
+<!-- ══════════ AUTH SCREEN ══════════ -->
+<div id="auth-screen" class="screen active">
+    <div class="auth-logo">NovBank</div>
+    <div class="auth-tagline">Secure · Smart · Simple</div>
+    <div class="auth-card">
+        <div class="auth-tabs">
+            <button class="auth-tab active" onclick="switchAuthTab('login')">Login</button>
+            <button class="auth-tab" onclick="switchAuthTab('register')">Register</button>
+        </div>
+
+        <!-- Login Form -->
+        <div id="login-form">
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" id="login-user" placeholder="your_username" autocomplete="off"/>
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="login-pass" placeholder="••••••••"/>
+            </div>
+            <button class="btn btn-primary" onclick="doLogin()">Login →</button>
+        </div>
+
+        <!-- Register Form -->
+        <div id="register-form" style="display:none">
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" id="reg-user" placeholder="min 3 characters, no spaces"/>
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="reg-pass" placeholder="min 4 characters"/>
+            </div>
+            <button class="btn btn-primary" onclick="doRegister()">Create Account →</button>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════ DASHBOARD SCREEN ══════════ -->
+<div id="dash-screen" class="screen">
+    <div class="topbar">
+        <div class="topbar-logo">NovBank</div>
+        <div class="topbar-user">
+            <div class="user-badge">👤 <span id="topbar-username"></span></div>
+            <button class="btn-logout" onclick="doLogout()">Logout</button>
+        </div>
+    </div>
+
+    <div class="dash-content">
+        <div class="dash-tabs">
+            <button class="dash-tab active" onclick="switchTab('accounts')">My Accounts</button>
+            <button class="dash-tab" onclick="switchTab('open')">Open Account</button>
+            <button class="dash-tab" onclick="switchTab('portfolio')">Portfolio</button>
+        </div>
+
+        <!-- ── ACCOUNTS TAB ── -->
+        <div id="tab-accounts" class="tab-pane active">
+            <div class="section-header">
+                <div class="section-title">Your Accounts</div>
+            </div>
+            <div id="accounts-grid" class="accounts-grid"></div>
+        </div>
+
+        <!-- ── OPEN ACCOUNT TAB ── -->
+        <div id="tab-open" class="tab-pane">
+            <div class="section-title" style="margin-bottom:24px">Open New Account</div>
+            <div class="form-card">
+                <div class="form-group">
+                    <label>Select Bank</label>
+                    <select id="new-bank">
+                        <option value="HDFC Bank">HDFC Bank</option>
+                        <option value="SBI Bank">SBI Bank</option>
+                        <option value="ICICI Bank">ICICI Bank</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Account Type</label>
+                        <select id="new-type">
+                            <option value="Savings">Savings</option>
+                            <option value="Current">Current</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Initial Deposit (₹)</label>
+                        <input type="number" id="new-balance" placeholder="min ₹500" min="500"/>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Set 4-Digit PIN</label>
+                    <input type="password" id="new-pin" placeholder="e.g. 1234" maxlength="4" class="pin-input"/>
+                </div>
+                <button class="btn btn-primary" onclick="doOpenAccount()">Create Account →</button>
+            </div>
+        </div>
+
+        <!-- ── PORTFOLIO TAB ── -->
+        <div id="tab-portfolio" class="tab-pane">
+            <div id="portfolio-content"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════ PIN MODAL ══════════ -->
+<div id="pin-modal" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-title">🔐 Enter PIN</div>
+        <div class="modal-sub" id="pin-modal-sub">Enter your 4-digit account PIN</div>
+        <div class="form-group">
+            <input type="password" id="pin-input" placeholder="••••" maxlength="4" class="pin-input"/>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closeModal('pin-modal')">Cancel</button>
+            <button class="btn btn-primary" onclick="submitPin()">Confirm →</button>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════ OPERATIONS MODAL ══════════ -->
+<div id="ops-modal" class="modal-overlay">
+    <div class="modal" style="max-width:520px">
+        <div class="modal-title" id="ops-title"></div>
+        <div class="modal-sub" id="ops-sub"></div>
+
+        <div class="balance-display">
+            <div>
+                <div class="balance-label">Available Balance</div>
+                <div class="balance-value" id="ops-balance">₹0.00</div>
+            </div>
+            <div style="font-size:0.7rem;color:var(--muted)" id="ops-accno"></div>
+        </div>
+
+        <div id="ops-menu">
+            <div class="op-grid">
+                <button class="op-btn" onclick="showOp('deposit')">
+                    <span class="op-icon">💰</span>
+                    <span class="op-label">Deposit</span>
+                </button>
+                <button class="op-btn" onclick="showOp('withdraw')">
+                    <span class="op-icon">🏧</span>
+                    <span class="op-label">Withdraw</span>
+                </button>
+                <button class="op-btn" onclick="showOp('transfer')">
+                    <span class="op-icon">🔄</span>
+                    <span class="op-label">Transfer</span>
+                </button>
+                <button class="op-btn" onclick="showOp('history')">
+                    <span class="op-icon">📜</span>
+                    <span class="op-label">History</span>
+                </button>
+            </div>
+            <button class="btn btn-secondary" onclick="closeModal('ops-modal')">Close</button>
+        </div>
+
+        <!-- Deposit/Withdraw Form -->
+        <div id="op-amount-form" style="display:none">
+            <div class="form-group">
+                <label id="op-amount-label">Amount (₹)</label>
+                <input type="number" id="op-amount" placeholder="Enter amount" min="1"/>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="showOp('menu')">← Back</button>
+                <button class="btn btn-primary" onclick="submitOp()">Confirm →</button>
+            </div>
+        </div>
+
+        <!-- Transfer Form -->
+        <div id="op-transfer-form" style="display:none">
+            <div class="form-group">
+                <label>Recipient Account Number</label>
+                <input type="text" id="op-to-acc" placeholder="Account number"/>
+            </div>
+            <div class="form-group">
+                <label>Amount (₹)</label>
+                <input type="number" id="op-transfer-amt" placeholder="Enter amount" min="1"/>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="showOp('menu')">← Back</button>
+                <button class="btn btn-primary" onclick="submitTransfer()">Transfer →</button>
+            </div>
+        </div>
+
+        <!-- History -->
+        <div id="op-history" style="display:none">
+            <div id="tx-list" class="tx-list" style="max-height:320px;overflow-y:auto;"></div>
+            <div style="margin-top:16px">
+                <button class="btn btn-secondary" onclick="showOp('menu')">← Back</button>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    const API = 'http://localhost:8080/api';
+    let token = null;
+    let username = null;
+    let selectedIndex = null;
+    let currentOp = null;
+    let pendingPinIndex = null;
+
+    // ── AUTH ──────────────────────────────────────────────────
+
+    function switchAuthTab(tab) {
+        document.querySelectorAll('.auth-tab').forEach((t,i) => t.classList.toggle('active', (i===0&&tab==='login')||(i===1&&tab==='register')));
+        document.getElementById('login-form').style.display    = tab==='login'    ? '' : 'none';
+        document.getElementById('register-form').style.display = tab==='register' ? '' : 'none';
+    }
+
+    async function doLogin() {
+        const u = document.getElementById('login-user').value.trim();
+        const p = document.getElementById('login-pass').value;
+        if (!u || !p) { showToast('Fill in all fields', 'error'); return; }
+
+        const res = await post('/login', { username: u, password: p });
+        if (res.success) {
+            token = res.token;
+            username = res.username;
+            showDashboard();
+        } else {
+            showToast(res.message || 'Login failed', 'error');
+        }
+    }
+
+    async function doRegister() {
+        const u = document.getElementById('reg-user').value.trim();
+        const p = document.getElementById('reg-pass').value;
+        if (!u || !p) { showToast('Fill in all fields', 'error'); return; }
+
+        const res = await post('/register', { username: u, password: p });
+        if (res.success) {
+            showToast('Registered! Please login.', 'success');
+            switchAuthTab('login');
+        } else {
+            showToast(res.message || 'Registration failed', 'error');
+        }
+    }
+
+    function doLogout() {
+        token = null; username = null; selectedIndex = null;
+        document.getElementById('auth-screen').classList.add('active');
+        document.getElementById('dash-screen').classList.remove('active');
+        document.getElementById('login-user').value = '';
+        document.getElementById('login-pass').value = '';
+    }
+
+    // ── DASHBOARD ────────────────────────────────────────────
+
+    async function showDashboard() {
+        document.getElementById('auth-screen').classList.remove('active');
+        document.getElementById('dash-screen').classList.add('active');
+        document.getElementById('topbar-username').textContent = username;
+        switchTab('accounts');
+        await loadAccounts();
+    }
+
+    function switchTab(tab) {
+        document.querySelectorAll('.dash-tab').forEach((t,i) => {
+            t.classList.toggle('active', ['accounts','open','portfolio'][i] === tab);
+        });
+        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+        document.getElementById('tab-' + tab).classList.add('active');
+        if (tab === 'portfolio') loadPortfolio();
+        if (tab === 'accounts') loadAccounts();
+    }
+
+    async function loadAccounts() {
+        const accounts = await get('/accounts');
+        const grid = document.getElementById('accounts-grid');
+
+        if (!accounts.length) {
+            grid.innerHTML = `<div class="no-accounts" style="grid-column:1/-1">
+        <p>No accounts yet.</p>
+        <button class="btn btn-primary btn-sm" onclick="switchTab('open')">Open Your First Account</button>
+      </div>`;
+            return;
+        }
+
+        grid.innerHTML = accounts.map(a => `
+      <div class="account-card ${a.locked ? 'locked' : ''}" onclick="${a.locked ? '' : `selectAccount(${a.index})`}">
+        <div class="card-bank">${a.bank}</div>
+        <div class="card-type">${a.type} Account</div>
+        <div class="card-accno">${a.accNo}</div>
+        ${a.locked ? '<div class="lock-badge">🔒 LOCKED</div>' : ''}
+      </div>
+    `).join('');
+    }
+
+    function selectAccount(index) {
+        pendingPinIndex = index;
+        const accounts = document.querySelectorAll('.account-card');
+        const card = accounts[index];
+        document.getElementById('pin-modal-sub').textContent = `Enter PIN for your ${card.querySelector('.card-bank').textContent} account`;
+        document.getElementById('pin-input').value = '';
+        openModal('pin-modal');
+        setTimeout(() => document.getElementById('pin-input').focus(), 100);
+    }
+
+    async function submitPin() {
+        const pin = document.getElementById('pin-input').value;
+        if (pin.length !== 4) { showToast('PIN must be 4 digits', 'error'); return; }
+
+        const res = await post('/verify-pin', { index: pendingPinIndex, pin });
+        if (res.success) {
+            selectedIndex = pendingPinIndex;
+            closeModal('pin-modal');
+            await openOpsModal();
+        } else {
+            showToast(res.message || 'Incorrect PIN', 'error');
+            document.getElementById('pin-input').value = '';
+        }
+    }
+
+    async function openOpsModal() {
+        const accounts = await get('/accounts');
+        const acc = accounts[selectedIndex];
+        const balRes = await get('/balance?index=' + selectedIndex);
+
+        document.getElementById('ops-title').textContent = acc.bank;
+        document.getElementById('ops-sub').textContent = acc.type + ' Account';
+        document.getElementById('ops-accno').textContent = acc.accNo;
+        document.getElementById('ops-balance').textContent = '₹' + Number(balRes.balance).toLocaleString('en-IN', {minimumFractionDigits:2});
+
+        showOp('menu');
+        openModal('ops-modal');
+    }
+
+    function showOp(op) {
+        currentOp = op;
+        document.getElementById('ops-menu').style.display         = op==='menu'     ? '' : 'none';
+        document.getElementById('op-amount-form').style.display   = (op==='deposit'||op==='withdraw') ? '' : 'none';
+        document.getElementById('op-transfer-form').style.display = op==='transfer' ? '' : 'none';
+        document.getElementById('op-history').style.display       = op==='history'  ? '' : 'none';
+
+        if (op==='deposit')  document.getElementById('op-amount-label').textContent = 'Deposit Amount (₹)';
+        if (op==='withdraw') document.getElementById('op-amount-label').textContent = 'Withdraw Amount (₹)';
+        if (op==='history')  loadHistory();
+    }
+
+    async function submitOp() {
+        const amount = document.getElementById('op-amount').value;
+        if (!amount || amount <= 0) { showToast('Enter a valid amount', 'error'); return; }
+
+        const endpoint = currentOp === 'deposit' ? '/deposit' : '/withdraw';
+        const res = await post(endpoint, { index: selectedIndex, amount });
+
+        if (res.success) {
+            document.getElementById('ops-balance').textContent = '₹' + Number(res.balance).toLocaleString('en-IN', {minimumFractionDigits:2});
+            document.getElementById('op-amount').value = '';
+            showToast(currentOp === 'deposit' ? '✅ Deposit successful!' : '✅ Withdrawal successful!', 'success');
+            showOp('menu');
+            loadAccounts();
+        } else {
+            showToast(res.message || 'Operation failed', 'error');
+        }
+    }
+
+    async function submitTransfer() {
+        const toAccNo = document.getElementById('op-to-acc').value.trim();
+        const amount  = document.getElementById('op-transfer-amt').value;
+        if (!toAccNo || !amount) { showToast('Fill all fields', 'error'); return; }
+
+        const res = await post('/transfer', { index: selectedIndex, toAccNo, amount });
+        if (res.success) {
+            document.getElementById('ops-balance').textContent = '₹' + Number(res.balance).toLocaleString('en-IN', {minimumFractionDigits:2});
+            document.getElementById('op-to-acc').value = '';
+            document.getElementById('op-transfer-amt').value = '';
+            showToast('✅ Transfer successful!', 'success');
+            showOp('menu');
+            loadAccounts();
+        } else {
+            showToast(res.message || 'Transfer failed', 'error');
+        }
+    }
+
+    async function loadHistory() {
+        const txs = await get('/transactions?index=' + selectedIndex);
+        const list = document.getElementById('tx-list');
+
+        if (!txs.length) {
+            list.innerHTML = '<div style="text-align:center;color:var(--muted);padding:24px">No transactions yet.</div>';
+            return;
+        }
+
+        list.innerHTML = txs.reverse().map(t => {
+            const isCredit   = t.type === 'Deposit' || t.type === 'Opening Deposit' || t.type === 'Transfer Received';
+            const isDebit    = t.type === 'Withdraw';
+            const isTransfer = t.type.startsWith('Transfer');
+            const isSent     = t.type === 'Transfer Sent';
+
+            const iconClass  = isCredit && !isTransfer ? 'credit' : isDebit ? 'debit' : 'transfer';
+            const icon       = isCredit && !isTransfer ? '↓' : isDebit ? '↑' : isSent ? '→' : '←';
+            const amtClass   = isCredit && !isTransfer ? 'credit' : isDebit ? 'debit' : isSent ? 'transfer-sent' : 'transfer-recv';
+            const amtPrefix  = isCredit && !isTransfer ? '+' : '-';
+            const date       = new Date(t.date).toLocaleString('en-IN', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+
+            return `<div class="tx-item">
+        <div class="tx-left">
+          <div class="tx-icon ${iconClass}">${icon}</div>
+          <div>
+            <div class="tx-type">${t.type}</div>
+            <div class="tx-date">${date}</div>
+            ${t.related ? `<div class="tx-related">↔ ${t.related}</div>` : ''}
+          </div>
+        </div>
+        <div class="tx-amount ${amtClass}">${amtPrefix}₹${Number(t.amount).toLocaleString('en-IN',{minimumFractionDigits:2})}</div>
+      </div>`;
+        }).join('');
+    }
+
+    // ── OPEN ACCOUNT ─────────────────────────────────────────
+
+    async function doOpenAccount() {
+        const bank    = document.getElementById('new-bank').value;
+        const type    = document.getElementById('new-type').value;
+        const balance = document.getElementById('new-balance').value;
+        const pin     = document.getElementById('new-pin').value;
+
+        if (!balance || !pin) { showToast('Fill all fields', 'error'); return; }
+        if (pin.length !== 4 || !/^\d+$/.test(pin)) { showToast('PIN must be 4 digits', 'error'); return; }
+        if (balance < 500) { showToast('Minimum deposit is ₹500', 'error'); return; }
+
+        const res = await post('/open-account', { bank, type, balance, pin });
+        if (res.success) {
+            showToast('🎉 Account created! No: ' + res.accNo, 'success');
+            document.getElementById('new-balance').value = '';
+            document.getElementById('new-pin').value = '';
+            switchTab('accounts');
+        } else {
+            showToast(res.message || 'Failed to create account', 'error');
+        }
+    }
+
+    // ── PORTFOLIO ────────────────────────────────────────────
+
+    async function loadPortfolio() {
+        const data = await get('/portfolio');
+        const container = document.getElementById('portfolio-content');
+
+        if (!data.accounts || !data.accounts.length) {
+            container.innerHTML = '<div class="no-accounts"><p>No accounts to display.</p></div>';
+            return;
+        }
+
+        container.innerHTML = `
+      <div class="portfolio-header">
+        <div>
+          <div class="portfolio-total-label">Total Net Worth</div>
+          <div class="portfolio-total">₹${Number(data.total).toLocaleString('en-IN', {minimumFractionDigits:2})}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="color:var(--muted);font-size:0.7rem;letter-spacing:2px;text-transform:uppercase">Accounts</div>
+          <div style="font-family:'Syne',sans-serif;font-size:1.8rem;font-weight:800">${data.accounts.length}</div>
+        </div>
+      </div>
+      <div class="portfolio-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Bank</th>
+              <th>Type</th>
+              <th>Account Number</th>
+              <th>Balance</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.accounts.map(a => `
+              <tr>
+                <td><strong>${a.bank}</strong></td>
+                <td><span class="badge badge-${a.type.toLowerCase()}">${a.type}</span></td>
+                <td style="color:var(--muted);font-size:0.8rem">${a.accNo}</td>
+                <td style="font-family:'Syne',sans-serif;font-weight:700;color:var(--accent)">
+                  ₹${Number(a.balance).toLocaleString('en-IN', {minimumFractionDigits:2})}
+                </td>
+                <td>${a.locked ? '<span class="badge badge-locked">Locked</span>' : '<span style="color:var(--accent);font-size:0.8rem">● Active</span>'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+    }
+
+    // ── UTILS ─────────────────────────────────────────────────
+
+    async function post(endpoint, data) {
+        try {
+            const body = Object.entries(data).map(([k,v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
+            const res = await fetch(API + endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Authorization': 'Bearer ' + token },
+                body
+            });
+            return await res.json();
+        } catch (e) {
+            showToast('Connection error — is the server running?', 'error');
+            return { success: false };
+        }
+    }
+
+    async function get(endpoint) {
+        try {
+            const res = await fetch(API + endpoint, {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            return await res.json();
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function openModal(id)  { document.getElementById(id).classList.add('active'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+    let toastTimer;
+    function showToast(msg, type='info') {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.className = 'toast show ' + type;
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+    }
+
+    // Enter key support
+    document.getElementById('login-pass').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+    document.getElementById('pin-input').addEventListener('keydown',  e => { if(e.key==='Enter') submitPin(); });
+</script>
+</body>
+</html>
