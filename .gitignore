@@ -3,6 +3,11 @@
 target/
 *.jar
 
+out/
+.idea/
+*.class
+*.iml
+src/DatabaseConnection.java
 ### IntelliJ IDEA ###
 out/
 !**/src/main/**/out/
