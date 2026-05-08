@@ -12,7 +12,9 @@ public class ApiServer {
 
     static AuthService authService = new AuthService();
     static ArrayList<Bank> banks = new ArrayList<>();
-    // Session store: token -> User
+
+    // Session store: token → logged-in User
+    // Token is created at login and sent to the browser — every request includes it
     static Map<String, User> sessions = new HashMap<>();
 
     public static void main(String[] args) throws Exception {
@@ -22,6 +24,7 @@ public class ApiServer {
             return;
         }
 
+        // Create 3 banks in memory and load all existing accounts from DB into them
         banks.add(new Bank("HDFC Bank"));
         banks.add(new Bank("SBI Bank"));
         banks.add(new Bank("ICICI Bank"));
@@ -29,6 +32,7 @@ public class ApiServer {
 
         HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
 
+        // Each context maps a URL path to a handler class
         server.createContext("/api/register",     new RegisterHandler());
         server.createContext("/api/login",        new LoginHandler());
         server.createContext("/api/accounts",     new AccountsHandler());
@@ -48,6 +52,7 @@ public class ApiServer {
     }
 
     // ─── STATIC FILE HANDLER ─────────────────────────────────
+    // Serves index.html when the browser visits /
     static class StaticHandler implements HttpHandler {
         public void handle(HttpExchange ex) throws IOException {
             String path = ex.getRequestURI().getPath();
@@ -59,8 +64,7 @@ public class ApiServer {
                     ex.sendResponseHeaders(200, bytes.length);
                     ex.getResponseBody().write(bytes);
                 } else {
-                    String msg = "index.html not found. Place it in the same folder as ApiServer.java";
-                    sendResponse(ex, 404, "{\"error\":\"" + msg + "\"}");
+                    sendResponse(ex, 404, "{\"error\":\"index.html not found.\"}");
                 }
             }
             ex.getResponseBody().close();
@@ -102,6 +106,7 @@ public class ApiServer {
     }
 
     // ─── GET ACCOUNTS ─────────────────────────────────────────
+    // Returns all bank accounts linked to the logged-in user as a JSON array
     static class AccountsHandler implements HttpHandler {
         public void handle(HttpExchange ex) throws IOException {
             User user = getUser(ex);
@@ -141,9 +146,10 @@ public class ApiServer {
             try { balance = Double.parseDouble(body.getOrDefault("balance", "0")); }
             catch (NumberFormatException e) { sendResponse(ex, 400, "{\"success\":false,\"message\":\"Invalid amount.\"}"); return; }
 
-            if (balance < 500) { sendResponse(ex, 400, "{\"success\":false,\"message\":\"Minimum deposit is ₹500.\"}"); return; }
+            if (balance < 500)          { sendResponse(ex, 400, "{\"success\":false,\"message\":\"Minimum deposit is Rs.500.\"}"); return; }
             if (!pin.matches("\\d{4}")) { sendResponse(ex, 400, "{\"success\":false,\"message\":\"PIN must be 4 digits.\"}"); return; }
 
+            // One account per bank per user
             for (User.BankAccountEntry e : user.getLinkedAccounts()) {
                 if (e.getBankName().equals(bankName)) {
                     sendResponse(ex, 400, "{\"success\":false,\"message\":\"You already have an account in " + bankName + ".\"}");
@@ -163,6 +169,7 @@ public class ApiServer {
             user.linkAccount(bankName, acc);
             DatabaseService.saveAccount(user.getUsername(), bankName, acc, type);
 
+            // Log the opening deposit as the first transaction
             Transaction tx = new Transaction("Opening Deposit", balance, accNo, user.getUsername(), null);
             acc.addTransaction(tx);
             DatabaseService.saveTransaction(accNo, tx);
@@ -172,6 +179,7 @@ public class ApiServer {
     }
 
     // ─── VERIFY PIN ───────────────────────────────────────────
+    // Must be called before any deposit, withdraw or transfer
     static class VerifyPinHandler implements HttpHandler {
         public void handle(HttpExchange ex) throws IOException {
             if (!ex.getRequestMethod().equals("POST")) { sendResponse(ex, 405, "{}"); return; }
@@ -206,11 +214,8 @@ public class ApiServer {
             double before = acc.getBalance();
             acc.deposit(amount, false);
 
-            if (acc.getBalance() > before) {
-                sendResponse(ex, 200, "{\"success\":true,\"balance\":" + acc.getBalance() + "}");
-            } else {
-                sendResponse(ex, 400, "{\"success\":false,\"message\":\"Deposit failed.\"}");
-            }
+            if (acc.getBalance() > before) sendResponse(ex, 200, "{\"success\":true,\"balance\":" + acc.getBalance() + "}");
+            else                           sendResponse(ex, 400, "{\"success\":false,\"message\":\"Deposit failed.\"}");
         }
     }
 
@@ -229,15 +234,13 @@ public class ApiServer {
             double before = acc.getBalance();
             acc.withdraw(amount, false);
 
-            if (acc.getBalance() < before) {
-                sendResponse(ex, 200, "{\"success\":true,\"balance\":" + acc.getBalance() + "}");
-            } else {
-                sendResponse(ex, 400, "{\"success\":false,\"message\":\"Insufficient balance.\"}");
-            }
+            if (acc.getBalance() < before) sendResponse(ex, 200, "{\"success\":true,\"balance\":" + acc.getBalance() + "}");
+            else                           sendResponse(ex, 400, "{\"success\":false,\"message\":\"Insufficient balance.\"}");
         }
     }
 
     // ─── TRANSFER ─────────────────────────────────────────────
+    // Both accounts must be in the same bank — cross-bank transfers not supported
     static class TransferHandler implements HttpHandler {
         public void handle(HttpExchange ex) throws IOException {
             if (!ex.getRequestMethod().equals("POST")) { sendResponse(ex, 405, "{}"); return; }
@@ -257,7 +260,7 @@ public class ApiServer {
             boolean success = bank.getBankService().transfer(entry.getAccount().getAccountNumber(), toAccNo, amount);
 
             if (!success) {
-                sendResponse(ex, 400, "{\"success\":false,\"message\":\"Transfer failed. Recipient account not found in this bank. Cross-bank transfers are not supported.\"}");
+                sendResponse(ex, 400, "{\"success\":false,\"message\":\"Transfer failed. Recipient not found in the same bank.\"}");
                 return;
             }
 
@@ -279,6 +282,7 @@ public class ApiServer {
     }
 
     // ─── TRANSACTIONS ─────────────────────────────────────────
+    // Fetches transaction history fresh from DB every time — always up to date
     static class TransactionsHandler implements HttpHandler {
         public void handle(HttpExchange ex) throws IOException {
             User user = getUser(ex);
@@ -288,13 +292,9 @@ public class ApiServer {
             int index = Integer.parseInt(query.replace("index=", ""));
             Account acc = user.getLinkedAccounts().get(index).getAccount();
 
-            // Rebuild transaction list from DB fresh
-            Account fresh = new SavingsAccount(acc.getAccountNumber(), acc.getAccountHolderName(), acc.getBalance(), "0000");
-            DatabaseService.loadTransactionsForAccount(fresh);
-
             StringBuilder json = new StringBuilder("[");
             boolean first = true;
-            for (Transaction t : getTransactions(fresh)) {
+            for (Transaction t : getTransactions(acc)) {
                 if (!first) json.append(",");
                 json.append("{")
                         .append("\"type\":\"").append(t.getType()).append("\",")
@@ -310,6 +310,7 @@ public class ApiServer {
     }
 
     // ─── PORTFOLIO ────────────────────────────────────────────
+    // Returns all accounts + combined total balance for the logged-in user
     static class PortfolioHandler implements HttpHandler {
         public void handle(HttpExchange ex) throws IOException {
             User user = getUser(ex);
@@ -338,12 +339,14 @@ public class ApiServer {
 
     // ─── HELPERS ──────────────────────────────────────────────
 
+    // Reads the Bearer token from the Authorization header and looks up the session
     static User getUser(HttpExchange ex) {
         String token = ex.getRequestHeaders().getFirst("Authorization");
         if (token == null) return null;
         return sessions.get(token.replace("Bearer ", ""));
     }
 
+    // Sends a JSON response with correct headers including CORS for browser access
     static void sendResponse(HttpExchange ex, int code, String json) throws IOException {
         ex.getResponseHeaders().set("Content-Type", "application/json");
         ex.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
@@ -354,6 +357,7 @@ public class ApiServer {
         ex.getResponseBody().close();
     }
 
+    // Parses the request body — supports both form-encoded (key=value&) and basic JSON
     static Map<String, String> parseBody(HttpExchange ex) throws IOException {
         String body = new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
         Map<String, String> map = new HashMap<>();
@@ -364,9 +368,8 @@ public class ApiServer {
                     java.net.URLDecoder.decode(kv[1], StandardCharsets.UTF_8)
             );
         }
-        // Also try JSON
         if (body.startsWith("{")) {
-            body = body.replaceAll("[{}\"]", "");
+            body = body.replaceAll("[{}\"\\s]", "");
             for (String pair : body.split(",")) {
                 String[] kv = pair.split(":", 2);
                 if (kv.length == 2) map.put(kv[0].trim(), kv[1].trim());
@@ -375,12 +378,13 @@ public class ApiServer {
         return map;
     }
 
+    // Finds a bank object by name from the in-memory banks list
     static Bank getBankByName(String name) {
         for (Bank b : banks) if (b.getBankName().equals(name)) return b;
         return null;
     }
 
-    // Reflection-free transaction access via DB reload
+    // Queries the DB directly for all transactions belonging to an account
     static java.util.List<Transaction> getTransactions(Account acc) {
         java.util.List<Transaction> list = new java.util.ArrayList<>();
         String sql = "SELECT * FROM transactions WHERE account_number = ? ORDER BY date_time ASC";
